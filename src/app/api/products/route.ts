@@ -20,25 +20,30 @@ export async function GET(request: NextRequest) {
     const syncProducts = await printful.getProducts()
     console.log(`Found ${syncProducts.length} synced products from your Printful store`)
     
-    // Transform sync products to our internal format
-    const transformedProducts = syncProducts.slice(0, limit).map(product => {
+    // Transform ALL sync products to our internal format first
+    const allTransformedProducts = syncProducts.map(product => {
       try {
         return transformPrintfulProduct(product)
       } catch (error) {
         console.error(`Error transforming product ${product.id}:`, error)
         return null
       }
-    }).filter(Boolean)
+    }).filter((p): p is NonNullable<typeof p> => p !== null) // Type-safe filter
 
-    console.log(`Transformed ${transformedProducts.length} products successfully`)
+    console.log(`Successfully transformed ${allTransformedProducts.length} out of ${syncProducts.length} products`)
+    
+    // Apply pagination after transformation
+    const startIndex = (page - 1) * limit
+    const endIndex = startIndex + limit
+    const paginatedProducts = allTransformedProducts.slice(startIndex, endIndex)
 
     return NextResponse.json({
-      products: transformedProducts,
+      products: paginatedProducts,
       pagination: {
         current_page: page,
-        total: syncProducts.length,
+        total: allTransformedProducts.length,
         per_page: limit,
-        total_pages: Math.ceil(syncProducts.length / limit),
+        total_pages: Math.ceil(allTransformedProducts.length / limit),
       }
     })
   } catch (error) {

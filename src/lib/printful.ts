@@ -264,35 +264,77 @@ class PrintfulAPI {
 
 // Helper function to transform Printful sync product to our internal product format
 export function transformPrintfulProduct(syncProduct: any) {
-  // Handle sync product structure from /sync/products endpoint
-  const defaultVariant = syncProduct.sync_variants?.find((v: any) => v.synced) || syncProduct.sync_variants?.[0]
-  const imageUrl = defaultVariant?.files?.find((f: any) => f.type === 'preview')?.preview_url || 
-                   syncProduct.thumbnail_url || 
-                   '/placeholder.jpg'
-  
-  // Get category from product type or name
-  const category = syncProduct.sync_variants?.[0]?.product?.type_name || 'General'
+  try {
+    // Handle sync product structure from /sync/products endpoint
+    if (!syncProduct || !syncProduct.sync_variants || syncProduct.sync_variants.length === 0) {
+      console.warn(`Product ${syncProduct?.id} has no variants, skipping`)
+      return null
+    }
 
-  return {
-    id: syncProduct.id,
-    name: syncProduct.name,
-    description: `High-quality ${syncProduct.name} with retro gaming design`,
-    price: defaultVariant ? parseFloat(defaultVariant.retail_price) : 25.99,
-    image: imageUrl,
-    category: category,
-    variants: (syncProduct.sync_variants || []).map((variant: any) => ({
-      id: variant.id,
-      title: variant.name,
-      price: parseFloat(variant.retail_price || '0'),
-      available: variant.synced,
-      sku: variant.sku,
-      sync_variant_id: variant.id,
-      product: variant.product,
-    })),
-    images: [imageUrl],
-    tags: [category.toLowerCase(), 'retro', 'gaming'],
-    printfulId: syncProduct.id,
-    external_id: syncProduct.external_id,
+    // Find a synced variant or use the first available
+    const defaultVariant = syncProduct.sync_variants.find((v: any) => v.synced) || syncProduct.sync_variants[0]
+    
+    if (!defaultVariant) {
+      console.warn(`Product ${syncProduct.id} has no valid variant`)
+      return null
+    }
+
+    // Get the best available image
+    const imageUrl = 
+      defaultVariant?.files?.find((f: any) => f.type === 'preview')?.preview_url ||
+      defaultVariant?.files?.find((f: any) => f.type === 'default')?.preview_url ||
+      defaultVariant?.product?.image ||
+      syncProduct.thumbnail_url ||
+      'https://via.placeholder.com/400x400/1a1a1a/00ffff?text=Product'
+    
+    // Get category from product type or name
+    const category = defaultVariant?.product?.type_name || syncProduct.sync_variants?.[0]?.product?.type_name || 'General'
+
+    // Parse retail price - ensure it's a valid number
+    let price = 25.99 // Default fallback
+    if (defaultVariant.retail_price) {
+      const parsedPrice = parseFloat(defaultVariant.retail_price)
+      if (!isNaN(parsedPrice) && parsedPrice > 0) {
+        price = parsedPrice
+      }
+    }
+
+    return {
+      id: syncProduct.id,
+      name: syncProduct.name,
+      description: `High-quality ${syncProduct.name}`,
+      price: price,
+      image: imageUrl,
+      category: category,
+      variants: (syncProduct.sync_variants || [])
+        .filter((v: any) => v.synced) // Only include synced variants
+        .map((variant: any) => {
+          let variantPrice = price // Use default price as fallback
+          if (variant.retail_price) {
+            const parsedVariantPrice = parseFloat(variant.retail_price)
+            if (!isNaN(parsedVariantPrice) && parsedVariantPrice > 0) {
+              variantPrice = parsedVariantPrice
+            }
+          }
+
+          return {
+            id: variant.id,
+            title: variant.name || 'Default',
+            price: variantPrice,
+            available: variant.synced,
+            sku: variant.sku || '',
+            sync_variant_id: variant.id,
+            product: variant.product,
+          }
+        }),
+      images: [imageUrl],
+      tags: [category.toLowerCase(), 'retro', 'gaming'],
+      printfulId: syncProduct.id,
+      external_id: syncProduct.external_id,
+    }
+  } catch (error) {
+    console.error(`Error transforming product ${syncProduct?.id}:`, error)
+    return null
   }
 }
 
