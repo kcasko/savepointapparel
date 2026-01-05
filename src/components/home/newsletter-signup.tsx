@@ -21,7 +21,7 @@ export default function NewsletterSignup() {
       
       toast.success('🎮 Welcome to the squad! Check your email for exclusive drops!')
       setEmail('')
-    } catch (error) {
+    } catch {
       toast.error('Oops! Something went wrong. Try again!')
     } finally {
       setIsSubmitting(false)

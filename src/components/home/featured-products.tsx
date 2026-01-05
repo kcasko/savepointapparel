@@ -22,7 +22,6 @@ interface Product {
 export default function FeaturedProducts() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchFeaturedProducts()
@@ -31,7 +30,6 @@ export default function FeaturedProducts() {
   const fetchFeaturedProducts = async () => {
     try {
       setLoading(true)
-      setError(null)
       
       const response = await fetch('/api/products?limit=4')
       
@@ -43,7 +41,6 @@ export default function FeaturedProducts() {
       setProducts(data.products || [])
     } catch (err) {
       console.error('Error fetching featured products:', err)
-      setError('Failed to load products')
       
       // Fallback to mock data if API fails
       setProducts([

@@ -16,10 +16,9 @@ interface EmbeddedCheckoutProps {
     image: string
     sync_variant_id?: number
   }>
-  total: number
 }
 
-export default function EmbeddedCheckout({ items, total }: EmbeddedCheckoutProps) {
+export default function EmbeddedCheckout({ items }: EmbeddedCheckoutProps) {
   const [clientSecret, setClientSecret] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')

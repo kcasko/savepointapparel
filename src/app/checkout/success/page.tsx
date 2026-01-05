@@ -1,14 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { CheckCircle, Package, Truck, Mail } from 'lucide-react'
 import Link from 'next/link'
 import { useCart } from '@/lib/context/cart-context'
 
 export default function CheckoutSuccessPage() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const { clearCart } = useCart()
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -145,7 +144,7 @@ export default function CheckoutSuccessPage() {
             <div className="text-4xl mb-4">📧</div>
             <h3 className="text-lg font-bold text-white mb-2 font-retro">Check Your Email</h3>
             <p className="text-gray-300 text-sm">
-              We've sent you a confirmation email with your order details and tracking information.
+              We&apos;ve sent you a confirmation email with your order details and tracking information.
             </p>
           </div>
           
@@ -153,7 +152,7 @@ export default function CheckoutSuccessPage() {
             <div className="text-4xl mb-4">🎯</div>
             <h3 className="text-lg font-bold text-white mb-2 font-retro">Track Your Order</h3>
             <p className="text-gray-300 text-sm">
-              You'll receive tracking information within 24 hours once your order ships.
+              You&apos;ll receive tracking information within 24 hours once your order ships.
             </p>
           </div>
         </motion.div>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import ProductCard from '@/components/products/product-card'
-import { Search, Filter, Grid, List } from 'lucide-react'
+import { Search, Grid, List } from 'lucide-react'
 
 interface Product {
   id: number

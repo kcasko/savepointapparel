@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { ShoppingCart, Menu, X, Search, User } from 'lucide-react'
+import { ShoppingCart, Menu, Search, User } from 'lucide-react'
 import { useCart } from '@/lib/context/cart-context'
 import MobileMenu from './mobile-menu'
 import CartDrawer from '../cart/cart-drawer'
@@ -11,7 +11,7 @@ import CartDrawer from '../cart/cart-drawer'
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isCartOpen, setIsCartOpen] = useState(false)
-  const { items, getTotalItems } = useCart()
+  const { getTotalItems } = useCart()
 
   const totalItems = getTotalItems()
 
