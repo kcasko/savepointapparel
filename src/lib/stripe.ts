@@ -282,8 +282,28 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
       const printfulResponse = await printful.createOrder(printfulOrder)
       console.log('✅ Printful order created successfully:', printfulResponse)
 
+      // Send confirmation email to customer
+      try {
+        const { sendOrderConfirmationEmail } = await import('./email')
+        await sendOrderConfirmationEmail({
+          customerEmail: orderData.customerEmail,
+          customerName: orderData.customerName,
+          orderNumber: session.id,
+          items: orderData.items.map(item => ({
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+          })),
+          totalAmount: orderData.totalAmount,
+          shippingAddress: orderData.shippingAddress,
+        })
+        console.log('✅ Order confirmation email sent')
+      } catch (emailError) {
+        console.error('❌ Error sending confirmation email:', emailError)
+        // Don't throw - email is not critical for order processing
+      }
+
       // TODO: Save order to database with Printful order ID
-      // TODO: Send confirmation email to customer
 
     } catch (printfulError) {
       console.error('❌ Error creating Printful order:', printfulError)
