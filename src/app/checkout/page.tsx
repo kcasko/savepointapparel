@@ -173,7 +173,7 @@ export default function CheckoutPage() {
                 </p>
               </motion.div>
             ) : (
-              <EmbeddedCheckout items={items} total={total} />
+              <EmbeddedCheckout items={items} />
             )}
           </div>
         </div>
