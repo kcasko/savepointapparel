@@ -6,12 +6,17 @@ import ProductCard from '@/components/products/product-card'
 import Link from 'next/link'
 
 interface Product {
-  id: number | string
+  id: number
   name: string
   price: number
   image: string
-  description?: string
-  category?: string
+  description: string
+  category: string
+  variants?: Array<{
+    id: number
+    sync_variant_id: number
+    [key: string]: any
+  }>
 }
 
 export default function FeaturedProducts() {
