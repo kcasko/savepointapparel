@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import PrintfulAPI, { transformPrintfulProduct } from '@/lib/printful'
+import { checkRateLimit, getClientIp, getRateLimitHeaders } from '@/lib/rate-limit'
 
 if (!process.env.PRINTFUL_API_TOKEN) {
   throw new Error('PRINTFUL_API_TOKEN is not set in environment variables')
@@ -11,6 +12,23 @@ const printful = new PrintfulAPI(
 )
 
 export async function GET(request: NextRequest) {
+  // Rate limiting: 120 requests per minute per IP
+  const clientIp = getClientIp(request)
+  const rateLimitResult = checkRateLimit(`products:${clientIp}`, {
+    windowMs: 60 * 1000,
+    maxRequests: 120,
+  })
+
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      {
+        status: 429,
+        headers: getRateLimitHeaders(rateLimitResult),
+      }
+    )
+  }
+
   const { searchParams } = new URL(request.url)
   const page = parseInt(searchParams.get('page') || '1')
   const limit = parseInt(searchParams.get('limit') || '12')

@@ -2,10 +2,19 @@
 
 import Image from 'next/image'
 import { motion } from 'framer-motion'
-import { ShoppingCart, Heart, Eye } from 'lucide-react'
+import { ShoppingCart } from 'lucide-react'
 import { useCart } from '@/lib/context/cart-context'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
+
+interface ProductVariant {
+  id: number
+  sync_variant_id: number
+  title?: string
+  price?: number
+  available?: boolean
+  sku?: string
+}
 
 interface Product {
   id: number
@@ -14,11 +23,7 @@ interface Product {
   image: string
   description: string
   category: string
-  variants?: Array<{
-    id: number
-    sync_variant_id: number
-    [key: string]: any
-  }>
+  variants?: ProductVariant[]
 }
 
 interface ProductCardProps {
@@ -59,33 +64,16 @@ export default function ProductCard({ product }: ProductCardProps) {
         />
         
         {/* Overlay Actions */}
-        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center space-x-4">
+        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
           <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            className="p-3 bg-white/20 backdrop-blur-sm rounded-full text-white hover:bg-cyan-400 hover:text-gray-900 transition-colors"
-            title="Quick View"
-          >
-            <Eye size={20} />
-          </motion.button>
-          
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            className="p-3 bg-white/20 backdrop-blur-sm rounded-full text-white hover:bg-pink-400 hover:text-gray-900 transition-colors"
-            title="Add to Wishlist"
-          >
-            <Heart size={20} />
-          </motion.button>
-          
-          <motion.button
+            type="button"
             onClick={handleAddToCart}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
-            className="p-3 bg-white/20 backdrop-blur-sm rounded-full text-white hover:bg-purple-400 hover:text-gray-900 transition-colors"
+            className="p-4 bg-white/20 backdrop-blur-sm rounded-full text-white hover:bg-cyan-400 hover:text-gray-900 transition-colors"
             title="Add to Cart"
           >
-            <ShoppingCart size={20} />
+            <ShoppingCart size={24} />
           </motion.button>
         </div>
 
@@ -115,6 +103,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           </div>
           
           <motion.button
+            type="button"
             onClick={handleAddToCart}
             className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/25 font-retro uppercase text-sm tracking-wide"
             whileHover={{ scale: 1.05 }}

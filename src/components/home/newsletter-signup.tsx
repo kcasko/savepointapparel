@@ -14,15 +14,31 @@ export default function NewsletterSignup() {
     if (!email) return
 
     setIsSubmitting(true)
-    
+
     try {
-      // TODO: Implement newsletter signup API
-      await new Promise(resolve => setTimeout(resolve, 1000)) // Mock delay
-      
-      toast.success('🎮 Welcome to the squad! Check your email for exclusive drops!')
+      const response = await fetch('/api/newsletter', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to subscribe')
+      }
+
+      if (data.alreadySubscribed) {
+        toast.success('🎮 You\'re already part of the squad!')
+      } else {
+        toast.success('🎮 Welcome to the squad! Check your email for exclusive drops!')
+      }
       setEmail('')
-    } catch {
-      toast.error('Oops! Something went wrong. Try again!')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Oops! Something went wrong. Try again!'
+      toast.error(message)
     } finally {
       setIsSubmitting(false)
     }

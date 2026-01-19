@@ -11,32 +11,21 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@prisma/client": "^5.7.0",
     "@stripe/react-stripe-js": "^2.4.0",
     "@stripe/stripe-js": "^2.2.0",
-    "axios": "^1.6.0",
-    "bcryptjs": "^2.4.3",
-    "dotenv": "^17.2.3",
     "framer-motion": "^10.16.0",
-    "jsonwebtoken": "^9.0.0",
     "lucide-react": "^0.294.0",
     "next": "14.2.35",
-    "next-auth": "^4.24.0",
     "nodemailer": "^7.0.7",
-    "prisma": "^5.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-hook-form": "^7.48.0",
     "react-hot-toast": "^2.4.0",
     "sharp": "^0.33.0",
-    "stripe": "^14.9.0",
-    "zustand": "^4.4.0"
+    "stripe": "^14.9.0"
   },
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.0",
     "@tailwindcss/typography": "^0.5.0",
-    "@types/bcryptjs": "^2.4.0",
-    "@types/jsonwebtoken": "^9.0.0",
     "@types/node": "^20.10.0",
     "@types/nodemailer": "^7.0.0",
     "@types/react": "^18.2.0",

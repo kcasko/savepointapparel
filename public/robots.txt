@@ -1,0 +1,14 @@
+# Save Point Apparel - Robots.txt
+# https://www.robotstxt.org/robotstxt.html
+
+User-agent: *
+Allow: /
+
+# Disallow API routes
+Disallow: /api/
+
+# Disallow admin pages (if any)
+Disallow: /admin/
+
+# Sitemap location
+Sitemap: https://savepointapparel.com/sitemap.xml

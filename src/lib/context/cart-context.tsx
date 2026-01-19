@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useReducer, ReactNode } from 'react'
+import { createContext, useContext, useReducer, ReactNode, useEffect, useState } from 'react'
 
 export interface CartItem {
   id: string
@@ -27,6 +27,7 @@ interface CartContextType {
   clearCart: () => void
   getTotalItems: () => number
   getItemCount: (id: string) => number
+  isHydrated: boolean
 }
 
 type CartAction =
@@ -34,14 +35,55 @@ type CartAction =
   | { type: 'REMOVE_ITEM'; payload: string }
   | { type: 'UPDATE_QUANTITY'; payload: { id: string; quantity: number } }
   | { type: 'CLEAR_CART' }
+  | { type: 'HYDRATE'; payload: CartState }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
 
+const CART_STORAGE_KEY = 'savepoint-cart'
+
+function loadCartFromStorage(): CartState {
+  if (typeof window === 'undefined') {
+    return { items: [], total: 0 }
+  }
+  try {
+    const stored = localStorage.getItem(CART_STORAGE_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (parsed.items && Array.isArray(parsed.items)) {
+        return {
+          items: parsed.items,
+          total: calculateTotal(parsed.items),
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error loading cart from storage:', error)
+  }
+  return { items: [], total: 0 }
+}
+
+function saveCartToStorage(state: CartState): void {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(state))
+  } catch (error) {
+    console.error('Error saving cart to storage:', error)
+  }
+}
+
+const calculateTotal = (items: CartItem[]): number => {
+  return items.reduce((total, item) => total + item.price * item.quantity, 0)
+}
+
 const cartReducer = (state: CartState, action: CartAction): CartState => {
   switch (action.type) {
+    case 'HYDRATE': {
+      return action.payload
+    }
+
     case 'ADD_ITEM': {
       const existingItemIndex = state.items.findIndex(
-        item => item.id === action.payload.id && 
+        item => item.id === action.payload.id &&
                  (item.variant || '') === (action.payload.variant || '') &&
                  (item.size || '') === (action.payload.size || '')
       )
@@ -106,12 +148,25 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
   }
 }
 
-const calculateTotal = (items: CartItem[]): number => {
-  return items.reduce((total, item) => total + item.price * item.quantity, 0)
-}
-
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { items: [], total: 0 })
+  const [isHydrated, setIsHydrated] = useState(false)
+
+  // Load cart from localStorage on mount
+  useEffect(() => {
+    const savedCart = loadCartFromStorage()
+    if (savedCart.items.length > 0) {
+      dispatch({ type: 'HYDRATE', payload: savedCart })
+    }
+    setIsHydrated(true)
+  }, [])
+
+  // Save cart to localStorage whenever it changes (after hydration)
+  useEffect(() => {
+    if (isHydrated) {
+      saveCartToStorage(state)
+    }
+  }, [state, isHydrated])
 
   const addItem = (item: Omit<CartItem, 'quantity'> & { quantity?: number }) => {
     dispatch({
@@ -150,6 +205,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     clearCart,
     getTotalItems,
     getItemCount,
+    isHydrated,
   }
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>

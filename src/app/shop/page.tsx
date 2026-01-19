@@ -1,9 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import ProductCard from '@/components/products/product-card'
 import { Search, Grid, List } from 'lucide-react'
+
+interface ProductVariant {
+  id: number
+  sync_variant_id: number
+  title?: string
+  price?: number
+  available?: boolean
+  sku?: string
+}
 
 interface Product {
   id: number
@@ -12,14 +21,12 @@ interface Product {
   image: string
   description: string
   category: string
-  variants?: Array<{
-    id: number
-    sync_variant_id: number
-    [key: string]: any
-  }>
+  variants?: ProductVariant[]
   images?: string[]
   tags?: string[]
 }
+
+const PRODUCTS_PER_PAGE = 12
 
 export default function ShopPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -28,20 +35,31 @@ export default function ShopPage() {
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [sortBy, setSortBy] = useState('name')
+  const [displayCount, setDisplayCount] = useState(PRODUCTS_PER_PAGE)
 
-  const categories = ['all', 'T-Shirts', 'Hoodies', 'Accessories', 'Stickers', 'Kids']
+  // Generate categories dynamically from products
+  const categories = useMemo(() => {
+    const uniqueCategories = new Set(products.map(p => p.category).filter(Boolean))
+    return ['all', ...Array.from(uniqueCategories).sort()]
+  }, [products])
 
   useEffect(() => {
     fetchProducts()
   }, [])
 
+  // Reset display count when filters change
+  useEffect(() => {
+    setDisplayCount(PRODUCTS_PER_PAGE)
+  }, [searchTerm, selectedCategory, sortBy])
+
   const fetchProducts = async () => {
     try {
-      const response = await fetch('/api/products')
+      const response = await fetch('/api/products?limit=100')
       const data = await response.json()
-      setProducts(data.products)
+      setProducts(data.products || [])
     } catch (error) {
       console.error('Error fetching products:', error)
+      setProducts([])
     } finally {
       setLoading(false)
     }
@@ -118,6 +136,7 @@ export default function ShopPage() {
             <div className="flex flex-wrap gap-2">
               {categories.map((category) => (
                 <button
+                  type="button"
                   key={category}
                   onClick={() => setSelectedCategory(category)}
                   className={`px-4 py-2 rounded-lg font-retro uppercase text-sm tracking-wide transition-all ${
@@ -133,26 +152,33 @@ export default function ShopPage() {
 
             {/* Sort and View Options */}
             <div className="flex items-center space-x-4">
+              <label htmlFor="sort-select" className="sr-only">Sort products</label>
               <select
+                id="sort-select"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
                 className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-cyan-400 focus:outline-none"
+                aria-label="Sort products"
               >
                 <option value="name">Sort by Name</option>
                 <option value="price-low">Price: Low to High</option>
                 <option value="price-high">Price: High to Low</option>
               </select>
 
-              <div className="flex border border-gray-600 rounded-lg overflow-hidden">
+              <div className="flex border border-gray-600 rounded-lg overflow-hidden" role="group" aria-label="View mode">
                 <button
+                  type="button"
                   onClick={() => setViewMode('grid')}
                   className={`p-2 ${viewMode === 'grid' ? 'bg-cyan-400 text-gray-900' : 'bg-gray-700 text-white'}`}
+                  aria-label="Grid view"
                 >
                   <Grid size={16} />
                 </button>
                 <button
+                  type="button"
                   onClick={() => setViewMode('list')}
                   className={`p-2 ${viewMode === 'list' ? 'bg-cyan-400 text-gray-900' : 'bg-gray-700 text-white'}`}
+                  aria-label="List view"
                 >
                   <List size={16} />
                 </button>
@@ -183,12 +209,12 @@ export default function ShopPage() {
               </p>
             </div>
           ) : (
-            filteredProducts.map((product, index) => (
+            filteredProducts.slice(0, displayCount).map((product, index) => (
               <motion.div
                 key={product.id}
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 + index * 0.1 }}
+                transition={{ delay: Math.min(0.5 + index * 0.05, 1) }}
               >
                 <ProductCard product={product} />
               </motion.div>
@@ -196,16 +222,20 @@ export default function ShopPage() {
           )}
         </motion.div>
 
-        {/* Load More Button (if needed for pagination) */}
-        {filteredProducts.length > 0 && (
+        {/* Load More Button */}
+        {filteredProducts.length > displayCount && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.8 }}
             className="text-center mt-12"
           >
-            <button className="retro-button">
-              Load More Products
+            <button
+              type="button"
+              className="retro-button"
+              onClick={() => setDisplayCount(prev => prev + PRODUCTS_PER_PAGE)}
+            >
+              Load More Products ({filteredProducts.length - displayCount} remaining)
             </button>
           </motion.div>
         )}
