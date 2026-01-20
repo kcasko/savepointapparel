@@ -1,0 +1,41 @@
+name: Playwright Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_dummy
+      STRIPE_SECRET_KEY: sk_test_dummy
+      STRIPE_WEBHOOK_SECRET: whsec_dummy
+      PRINTFUL_API_TOKEN: printful_dummy
+      PRINTFUL_STORE_ID: "0"
+      DATABASE_URL: file:./dev.db
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: test_secret
+      EMAIL_SERVER_HOST: smtp.example.com
+      EMAIL_SERVER_PORT: "587"
+      EMAIL_SERVER_USER: test@example.com
+      EMAIL_SERVER_PASSWORD: test_password
+      EMAIL_FROM: test@example.com
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      NEXT_PUBLIC_SITE_NAME: Save Point Apparel
+      ADMIN_API_KEY: test_admin_key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+      - name: Run Playwright tests
+        run: npm run test:e2e

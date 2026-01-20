@@ -1,45 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server'
+import prisma from '@/lib/db'
+import { requireAdminAuth } from '@/lib/auth'
+import { validateCSRFToken, csrfErrorResponse } from '@/lib/csrf'
+import { checkRateLimit, getClientIp, getRateLimitHeaders } from '@/lib/rate-limit'
 
-// Simple in-memory store for demo - in production, use a database or email service
-const subscribers = new Set<string>()
+// Stricter email validation regex with length limits
+// Max local part: 64 chars, max domain: 255 chars, min TLD: 2 chars
+const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,253}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,253}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/
+const MAX_EMAIL_LENGTH = 254 // RFC 5321
 
-// Email validation regex
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-// Rate limiting: track requests per IP
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
 const RATE_LIMIT_WINDOW = 60 * 1000 // 1 minute
 const MAX_REQUESTS = 5 // 5 requests per minute
 
-function isRateLimited(ip: string): boolean {
-  const now = Date.now()
-  const record = rateLimitMap.get(ip)
-
-  if (!record || now > record.resetTime) {
-    rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW })
-    return false
-  }
-
-  if (record.count >= MAX_REQUESTS) {
-    return true
-  }
-
-  record.count++
-  return false
-}
-
 export async function POST(request: NextRequest) {
-  try {
-    // Get client IP for rate limiting
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ||
-               request.headers.get('x-real-ip') ||
-               'unknown'
+  // CSRF validation for newsletter signup (state-changing operation)
+  const isValidCSRF = await validateCSRFToken(request)
+  if (!isValidCSRF) {
+    return csrfErrorResponse()
+  }
 
-    // Check rate limit
-    if (isRateLimited(ip)) {
+  try {
+    // Validate Content-Type header
+    const contentType = request.headers.get('content-type')
+    if (!contentType || !contentType.includes('application/json')) {
+      return NextResponse.json(
+        { error: 'Content-Type must be application/json' },
+        { status: 400 }
+      )
+    }
+
+    // Get client IP for rate limiting
+    const ip = getClientIp(request)
+    const rateLimitResult = checkRateLimit(`newsletter:${ip}`, {
+      windowMs: RATE_LIMIT_WINDOW,
+      maxRequests: MAX_REQUESTS,
+    })
+
+    if (!rateLimitResult.success) {
       return NextResponse.json(
         { error: 'Too many requests. Please try again later.' },
-        { status: 429 }
+        {
+          status: 429,
+          headers: getRateLimitHeaders(rateLimitResult),
+        }
       )
     }
 
@@ -54,8 +57,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate email format
+    // Validate email length
     const trimmedEmail = email.trim().toLowerCase()
+    if (trimmedEmail.length > MAX_EMAIL_LENGTH) {
+      return NextResponse.json(
+        { error: 'Email address is too long' },
+        { status: 400 }
+      )
+    }
+
+    // Validate email format
     if (!EMAIL_REGEX.test(trimmedEmail)) {
       return NextResponse.json(
         { error: 'Please enter a valid email address' },
@@ -63,23 +74,40 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if already subscribed
-    if (subscribers.has(trimmedEmail)) {
+    const existingSubscriber = await prisma.newsletterSubscriber.findUnique({
+      where: { email: trimmedEmail },
+    })
+
+    if (existingSubscriber?.isActive) {
       return NextResponse.json(
         { message: 'You are already subscribed!', alreadySubscribed: true },
         { status: 200 }
       )
     }
 
-    // Add to subscribers
-    subscribers.add(trimmedEmail)
+    const source = typeof body.source === 'string' ? body.source.trim() : ''
+    const normalizedSource = source ? source.slice(0, 100) : undefined
+    const ipAddress = ip === 'unknown' ? null : ip
 
-    // In production, you would:
-    // 1. Save to database
-    // 2. Send confirmation email
-    // 3. Integrate with email service (Mailchimp, SendGrid, etc.)
-
-    console.log(`New newsletter subscriber: ${trimmedEmail}`)
+    if (existingSubscriber) {
+      await prisma.newsletterSubscriber.update({
+        where: { email: trimmedEmail },
+        data: {
+          isActive: true,
+          unsubscribedAt: null,
+          source: normalizedSource || existingSubscriber.source,
+          ipAddress,
+        },
+      })
+    } else {
+      await prisma.newsletterSubscriber.create({
+        data: {
+          email: trimmedEmail,
+          source: normalizedSource || undefined,
+          ipAddress,
+        },
+      })
+    }
 
     return NextResponse.json({
       message: 'Successfully subscribed to the newsletter!',
@@ -94,10 +122,18 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
-  // Return subscriber count (for admin purposes)
+export async function GET(request: NextRequest) {
+  const authError = requireAdminAuth(request)
+  if (authError) {
+    return authError
+  }
+
+  const count = await prisma.newsletterSubscriber.count({
+    where: { isActive: true },
+  })
+
   return NextResponse.json({
-    count: subscribers.size,
-    message: 'Newsletter API is running'
+    count,
+    message: 'Newsletter API is running',
   })
 }

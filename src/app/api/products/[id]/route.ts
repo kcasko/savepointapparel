@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import PrintfulAPI, { transformPrintfulProduct } from '@/lib/printful'
+import { checkRateLimit, getClientIp, getRateLimitHeaders } from '@/lib/rate-limit'
 
 if (!process.env.PRINTFUL_API_TOKEN) {
   throw new Error('PRINTFUL_API_TOKEN is not set in environment variables')
@@ -10,11 +11,41 @@ const printful = new PrintfulAPI(
   process.env.PRINTFUL_STORE_ID
 )
 
+// Validate product ID format (should be numeric)
+function isValidProductId(id: string): boolean {
+  return /^\d+$/.test(id)
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // Rate limiting: 60 requests per minute per IP
+  const clientIp = getClientIp(request)
+  const rateLimitResult = checkRateLimit(`product:${clientIp}`, {
+    windowMs: 60 * 1000,
+    maxRequests: 60,
+  })
+
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      {
+        status: 429,
+        headers: getRateLimitHeaders(rateLimitResult),
+      }
+    )
+  }
+
   const id = params.id
+
+  // Validate ID format to prevent potential injection
+  if (!isValidProductId(id)) {
+    return NextResponse.json(
+      { error: 'Invalid product ID format' },
+      { status: 400 }
+    )
+  }
 
   try {
     // Get product from Printful

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { EmbeddedCheckoutProvider, EmbeddedCheckout as StripeEmbeddedCheckout } from '@stripe/react-stripe-js'
 import { loadStripe } from '@stripe/stripe-js'
 import { motion } from 'framer-motion'
+import { csrfFetch } from '@/hooks/use-csrf'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
@@ -33,25 +34,24 @@ export default function EmbeddedCheckout({ items }: EmbeddedCheckoutProps) {
     setLoading(true)
     setError('')
     try {
-      const response = await fetch('/api/checkout', {
+      const response = await csrfFetch('/api/checkout', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           items,
         }),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to create checkout session')
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to create checkout session')
       }
 
       const data = await response.json()
       setClientSecret(data.clientSecret)
     } catch (error) {
       console.error('Error creating checkout session:', error)
-      setError('Failed to initialize checkout. Please try again.')
+      const message = error instanceof Error ? error.message : 'Failed to initialize checkout. Please try again.'
+      setError(message)
     } finally {
       setLoading(false)
     }

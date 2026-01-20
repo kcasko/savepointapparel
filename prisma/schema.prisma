@@ -1,0 +1,102 @@
+// Prisma schema for Save Point Apparel
+// PostgreSQL-backed schema (Supabase compatible)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Order model to persist orders
+model Order {
+  id                String      @id @default(cuid())
+  stripeSessionId   String      @unique
+  printfulOrderId   String?
+
+  // Customer information
+  customerEmail     String
+  customerName      String
+  customerPhone     String?
+
+  // Order details
+  totalAmount       Decimal
+  currency          String      @default("USD")
+  status            OrderStatus @default(PENDING)
+  paymentStatus     String
+
+  // Timestamps
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  items             OrderItem[]
+  shippingAddress   ShippingAddress?
+
+  @@index([customerEmail])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id              String  @id @default(cuid())
+  orderId         String
+
+  // Product details
+  productId       String
+  productName     String
+  syncVariantId   Int?
+  quantity        Int
+  price           Decimal
+
+  // Relations
+  order           Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model ShippingAddress {
+  id            String  @id @default(cuid())
+  orderId       String  @unique
+
+  name          String
+  address1      String
+  address2      String?
+  city          String
+  stateCode     String
+  countryCode   String
+  zip           String
+  phone         String?
+
+  // Relations
+  order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+// Newsletter subscribers
+model NewsletterSubscriber {
+  id            String    @id @default(cuid())
+  email         String    @unique
+
+  // Subscription status
+  isActive      Boolean   @default(true)
+  subscribedAt  DateTime  @default(now())
+  unsubscribedAt DateTime?
+
+  // Tracking
+  source        String?   // Where they signed up from
+  ipAddress     String?   // For rate limiting/fraud prevention
+
+  @@index([email])
+  @@index([isActive])
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}

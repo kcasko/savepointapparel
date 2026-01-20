@@ -1,5 +1,17 @@
 import nodemailer from 'nodemailer'
 
+// HTML escape function to prevent XSS in emails
+function escapeHtml(text: string): string {
+  const htmlEscapes: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;',
+  }
+  return text.replace(/[&<>"']/g, (char) => htmlEscapes[char])
+}
+
 interface OrderEmailData {
   customerEmail: string
   customerName: string
@@ -52,13 +64,26 @@ export async function sendOrderConfirmationEmail(data: OrderEmailData) {
     return { success: false, error: 'Email not configured' }
   }
 
+  // Escape all user-provided data to prevent XSS
+  const safeCustomerName = escapeHtml(data.customerName)
+  const safeOrderNumber = escapeHtml(data.orderNumber)
+  const safeShippingAddress = {
+    name: escapeHtml(data.shippingAddress.name),
+    address1: escapeHtml(data.shippingAddress.address1),
+    address2: data.shippingAddress.address2 ? escapeHtml(data.shippingAddress.address2) : '',
+    city: escapeHtml(data.shippingAddress.city),
+    state_code: escapeHtml(data.shippingAddress.state_code),
+    country_code: escapeHtml(data.shippingAddress.country_code),
+    zip: escapeHtml(data.shippingAddress.zip),
+  }
+
   const itemsList = data.items
     .map(
       (item) =>
         `<tr>
-          <td style="padding: 12px; border-bottom: 1px solid #333; color: #ffffff;">${item.name}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #333; color: #ffffff;">${escapeHtml(item.name)}</td>
           <td style="padding: 12px; border-bottom: 1px solid #333; text-align: center; color: #ffffff;">${item.quantity}</td>
-          <td style="padding: 12px; border-bottom: 1px solid #333; text-align: right; color: #ffffff;">$${item.price}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #333; text-align: right; color: #ffffff;">$${escapeHtml(item.price)}</td>
         </tr>`
     )
     .join('')
@@ -148,12 +173,12 @@ export async function sendOrderConfirmationEmail(data: OrderEmailData) {
           <p style="color: #888; margin: 10px 0 0 0;">Order Confirmation</p>
         </div>
 
-        <p style="color: #ffffff;">Hey ${data.customerName}! 🎮</p>
+        <p style="color: #ffffff;">Hey ${safeCustomerName}! 🎮</p>
         <p style="color: #ffffff;">Thanks for your order! Your retro gaming gear is on its way!</p>
 
         <div class="section">
           <div class="section-title">Order Details</div>
-          <p style="color: #ffffff;"><strong>Order Number:</strong> ${data.orderNumber}</p>
+          <p style="color: #ffffff;"><strong>Order Number:</strong> ${safeOrderNumber}</p>
           
           <table>
             <thead>
@@ -174,11 +199,11 @@ export async function sendOrderConfirmationEmail(data: OrderEmailData) {
         <div class="section">
           <div class="section-title">Shipping Address</div>
           <p style="color: #ffffff;">
-            ${data.shippingAddress.name}<br>
-            ${data.shippingAddress.address1}<br>
-            ${data.shippingAddress.address2 ? `${data.shippingAddress.address2}<br>` : ''}
-            ${data.shippingAddress.city}, ${data.shippingAddress.state_code} ${data.shippingAddress.zip}<br>
-            ${data.shippingAddress.country_code}
+            ${safeShippingAddress.name}<br>
+            ${safeShippingAddress.address1}<br>
+            ${safeShippingAddress.address2 ? `${safeShippingAddress.address2}<br>` : ''}
+            ${safeShippingAddress.city}, ${safeShippingAddress.state_code} ${safeShippingAddress.zip}<br>
+            ${safeShippingAddress.country_code}
           </p>
         </div>
 

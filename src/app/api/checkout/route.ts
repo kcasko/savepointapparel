@@ -2,6 +2,28 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createCheckoutSession, CheckoutSessionData } from '@/lib/stripe'
 import PrintfulAPI, { transformPrintfulProduct } from '@/lib/printful'
 import { checkRateLimit, getClientIp, getRateLimitHeaders } from '@/lib/rate-limit'
+import { validateCSRFToken, csrfErrorResponse } from '@/lib/csrf'
+
+// Whitelist of allowed origins for redirect URLs
+const ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'https://localhost:3000',
+  process.env.NEXT_PUBLIC_SITE_URL,
+].filter(Boolean) as string[]
+
+function getValidOrigin(requestOrigin: string | null): string {
+  const defaultOrigin = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  if (!requestOrigin) return defaultOrigin
+
+  // Check if origin is in whitelist
+  if (ALLOWED_ORIGINS.includes(requestOrigin)) {
+    return requestOrigin
+  }
+
+  // Log suspicious origin attempt
+  console.warn(`Rejected invalid origin: ${requestOrigin}`)
+  return defaultOrigin
+}
 
 interface CheckoutItem {
   id: string
@@ -116,6 +138,12 @@ async function validateAndGetPrices(items: CheckoutItem[]): Promise<{ validatedI
 }
 
 export async function POST(request: NextRequest) {
+  // CSRF validation for checkout (state-changing operation)
+  const isValidCSRF = await validateCSRFToken(request)
+  if (!isValidCSRF) {
+    return csrfErrorResponse()
+  }
+
   // Rate limiting: 10 checkout attempts per minute per IP
   const clientIp = getClientIp(request)
   const rateLimitResult = checkRateLimit(`checkout:${clientIp}`, {
@@ -144,7 +172,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate items have required fields
+    // Validate Content-Type header
+    const contentType = request.headers.get('content-type')
+    if (!contentType || !contentType.includes('application/json')) {
+      return NextResponse.json(
+        { error: 'Content-Type must be application/json' },
+        { status: 400 }
+      )
+    }
+
+    // Validate items have required fields and valid values
     for (const item of items) {
       if (!item.id || !item.name || typeof item.price !== 'number' || typeof item.quantity !== 'number') {
         return NextResponse.json(
@@ -152,9 +189,10 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
-      if (item.price < 0) {
+      // Validate price is a finite positive number
+      if (!Number.isFinite(item.price) || item.price < 0.01) {
         return NextResponse.json(
-          { error: 'Invalid item data: price cannot be negative' },
+          { error: 'Invalid item data: price must be a positive number' },
           { status: 400 }
         )
       }
@@ -177,8 +215,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get the base URL for redirect URLs
-    const origin = request.headers.get('origin') || 'http://localhost:3000'
+    // Get validated origin for redirect URLs (prevents open redirect)
+    const origin = getValidOrigin(request.headers.get('origin'))
 
     const checkoutData: CheckoutSessionData = {
       items: validatedItems.map((item) => ({

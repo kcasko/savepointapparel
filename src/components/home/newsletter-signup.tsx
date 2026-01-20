@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Mail, Send } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { csrfFetch } from '@/hooks/use-csrf'
 
 export default function NewsletterSignup() {
   const [email, setEmail] = useState('')
@@ -16,11 +17,8 @@ export default function NewsletterSignup() {
     setIsSubmitting(true)
 
     try {
-      const response = await fetch('/api/newsletter', {
+      const response = await csrfFetch('/api/newsletter', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ email }),
       })
 

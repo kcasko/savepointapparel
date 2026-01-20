@@ -1,4 +1,5 @@
 import Stripe from 'stripe'
+import { createOrder, getOrderByStripeSessionId, updateOrderWithPrintfulId } from './orders'
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('STRIPE_SECRET_KEY is not set in environment variables')
@@ -189,39 +190,72 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
       return // Exit early, will process when address is available
     }
 
-    // Extract order details
+    const currency = (session.currency || 'usd').toUpperCase()
+    const totalAmount = session.amount_total ? session.amount_total / 100 : 0
+
+    const shippingAddress = {
+      name: shippingDetails.name || customerDetails.name || 'Customer',
+      address1: shippingDetails.address.line1 || '',
+      address2: shippingDetails.address.line2 || undefined,
+      city: shippingDetails.address.city || '',
+      stateCode: shippingDetails.address.state || '',
+      countryCode: shippingDetails.address.country || '',
+      zip: shippingDetails.address.postal_code || '',
+      phone: customerDetails.phone || undefined,
+    }
+
+    const items = expandedSession.line_items.data.map(item => {
+      const unitAmount = item.price?.unit_amount ?? 0
+      const rawSyncVariantId = item.price?.metadata?.sync_variant_id
+      const parsedSyncVariantId = rawSyncVariantId ? parseInt(rawSyncVariantId, 10) : undefined
+      const syncVariantId = parsedSyncVariantId && !Number.isNaN(parsedSyncVariantId) ? parsedSyncVariantId : undefined
+      const productId = item.price?.metadata?.product_id || item.price?.product?.toString() || ''
+
+      return {
+        name: item.description || 'Item',
+        productId,
+        syncVariantId,
+        quantity: item.quantity || 1,
+        price: unitAmount / 100,
+      }
+    })
+
     const orderData = {
       stripeSessionId: session.id,
       customerEmail: customerDetails.email,
-      customerName: customerDetails.name || shippingDetails.name || 'Customer',
-      customerPhone: customerDetails.phone,
-      shippingAddress: {
-        name: shippingDetails.name || customerDetails.name || 'Customer',
-        address1: shippingDetails.address.line1 || '',
-        address2: shippingDetails.address.line2 || '',
-        city: shippingDetails.address.city || '',
-        state_code: shippingDetails.address.state || '',
-        country_code: shippingDetails.address.country || '',
-        zip: shippingDetails.address.postal_code || '',
-        phone: customerDetails.phone || '',
-        email: customerDetails.email,
-      },
-      items: expandedSession.line_items.data.map(item => ({
-        name: item.description,
-        productId: item.price?.product?.toString() || '',
-        syncVariantId: item.price?.metadata?.sync_variant_id,
-        quantity: item.quantity || 1,
-        price: item.price?.unit_amount ? (item.price.unit_amount / 100).toFixed(2) : '0.00',
-      })),
-      totalAmount: session.amount_total ? (session.amount_total / 100).toFixed(2) : '0.00',
-      currency: session.currency,
-      paymentStatus: session.payment_status,
+      customerName: customerDetails.name || shippingAddress.name || 'Customer',
+      customerPhone: customerDetails.phone || undefined,
+      totalAmount,
+      currency,
+      paymentStatus: session.payment_status || 'paid',
+      items,
+      shippingAddress,
     }
 
-    console.log('📦 Creating Printful order with data:', JSON.stringify(orderData, null, 2))
+    const emailShippingAddress = {
+      name: shippingAddress.name,
+      address1: shippingAddress.address1,
+      address2: shippingAddress.address2,
+      city: shippingAddress.city,
+      state_code: shippingAddress.stateCode,
+      country_code: shippingAddress.countryCode,
+      zip: shippingAddress.zip,
+    }
+
+    const totalAmountFormatted = totalAmount.toFixed(2)
+    let existingOrder = await getOrderByStripeSessionId(session.id)
+
+    if (!existingOrder) {
+      existingOrder = await createOrder(orderData)
+      console.log(`dY"? Order recorded for session: ${session.id}, items: ${orderData.items.length}`)
+    }
 
     // Create Printful order
     try {
+      if (existingOrder?.printfulOrderId) {
+        console.log(`Printful order already recorded for session: ${session.id}`)
+        return orderData
+      }
       const PrintfulAPI = (await import('./printful')).default
       const printful = new PrintfulAPI(
         process.env.PRINTFUL_API_TOKEN!,
@@ -230,18 +264,20 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
 
       // Map items to Printful order format
       const printfulOrderItems = orderData.items.map(item => {
-        const syncVariantId = item.syncVariantId ? parseInt(item.syncVariantId) : null
-        
-        if (!syncVariantId || isNaN(syncVariantId)) {
+        const syncVariantId = item.syncVariantId
+
+        if (typeof syncVariantId !== 'number' || Number.isNaN(syncVariantId)) {
           console.warn(`Skipping item ${item.name} - missing or invalid sync_variant_id`)
           return null
         }
-        
+
+        const price = item.price.toFixed(2)
+
         return {
           sync_variant_id: syncVariantId,
           quantity: item.quantity,
-          price: item.price,
-          retail_price: item.price,
+          price,
+          retail_price: price,
         }
       }).filter((item): item is NonNullable<typeof item> => item !== null) // Type-safe filter
 
@@ -254,33 +290,37 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
         external_id: session.id,
         shipping: 'STANDARD',
         recipient: {
-          name: orderData.shippingAddress.name,
-          address1: orderData.shippingAddress.address1,
-          address2: orderData.shippingAddress.address2,
-          city: orderData.shippingAddress.city,
-          state_code: orderData.shippingAddress.state_code,
-          state_name: orderData.shippingAddress.state_code, // Use state_code as fallback
-          country_code: orderData.shippingAddress.country_code,
-          country_name: orderData.shippingAddress.country_code, // Use country_code as fallback
-          zip: orderData.shippingAddress.zip,
-          phone: orderData.shippingAddress.phone,
-          email: orderData.shippingAddress.email,
+          name: shippingAddress.name,
+          address1: shippingAddress.address1,
+          address2: shippingAddress.address2,
+          city: shippingAddress.city,
+          state_code: shippingAddress.stateCode,
+          state_name: shippingAddress.stateCode, // Use state_code as fallback
+          country_code: shippingAddress.countryCode,
+          country_name: shippingAddress.countryCode, // Use country_code as fallback
+          zip: shippingAddress.zip,
+          phone: shippingAddress.phone,
+          email: orderData.customerEmail,
         },
         items: printfulOrderItems,
         retail_costs: {
-          currency: orderData.currency?.toUpperCase() || 'USD',
-          subtotal: orderData.totalAmount,
+          currency,
+          subtotal: totalAmountFormatted,
           discount: '0.00',
           shipping: '0.00', // Shipping is calculated by Printful, but we need to provide initial value
           tax: '0.00', // Tax calculated by Stripe, Printful recalculates
           vat: '0.00',
-          total: orderData.totalAmount,
+          total: totalAmountFormatted,
         },
       }
 
-      console.log('🚀 Submitting order to Printful:', JSON.stringify(printfulOrder, null, 2))
+      console.log(`dYs? Submitting order to Printful for session: ${session.id}`)
       const printfulResponse = await printful.createOrder(printfulOrder)
-      console.log('✅ Printful order created successfully:', printfulResponse)
+      console.log(`?o. Printful order created for session: ${session.id}`)
+      const printfulOrderId = printfulResponse?.id?.toString()
+      if (printfulOrderId) {
+        await updateOrderWithPrintfulId(session.id, printfulOrderId)
+      }
 
       // Send confirmation email to customer
       try {
@@ -292,18 +332,16 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
           items: orderData.items.map(item => ({
             name: item.name,
             quantity: item.quantity,
-            price: item.price,
+            price: item.price.toFixed(2),
           })),
-          totalAmount: orderData.totalAmount,
-          shippingAddress: orderData.shippingAddress,
+          totalAmount: totalAmountFormatted,
+          shippingAddress: emailShippingAddress,
         })
         console.log('✅ Order confirmation email sent')
       } catch (emailError) {
         console.error('❌ Error sending confirmation email:', emailError)
         // Don't throw - email is not critical for order processing
       }
-
-      // TODO: Save order to database with Printful order ID
 
     } catch (printfulError) {
       console.error('❌ Error creating Printful order:', printfulError)
