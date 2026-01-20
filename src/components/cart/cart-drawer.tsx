@@ -43,8 +43,11 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   <h2 className="text-xl font-bold text-white font-retro">Your Cart</h2>
                 </div>
                 <button
+                  type="button"
                   onClick={onClose}
                   className="text-gray-400 hover:text-white transition-colors"
+                  aria-label="Close cart"
+                  title="Close cart"
                 >
                   <X size={24} />
                 </button>
@@ -111,8 +114,11 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                         {/* Quantity Controls */}
                         <div className="flex items-center space-x-2">
                           <button
+                            type="button"
                             onClick={() => updateQuantity(item.id, item.quantity - 1)}
                             className="p-1 text-gray-400 hover:text-white transition-colors"
+                            aria-label="Decrease quantity"
+                            title="Decrease quantity"
                           >
                             <Minus size={16} />
                           </button>
@@ -120,8 +126,11 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                             {item.quantity}
                           </span>
                           <button
+                            type="button"
                             onClick={() => updateQuantity(item.id, item.quantity + 1)}
                             className="p-1 text-gray-400 hover:text-white transition-colors"
+                            aria-label="Increase quantity"
+                            title="Increase quantity"
                           >
                             <Plus size={16} />
                           </button>
@@ -129,8 +138,11 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
 
                         {/* Remove Button */}
                         <button
+                          type="button"
                           onClick={() => removeItem(item.id)}
                           className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                          aria-label="Remove item"
+                          title="Remove item"
                         >
                           <Trash2 size={16} />
                         </button>

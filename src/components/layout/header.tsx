@@ -73,7 +73,11 @@ export default function Header() {
             {/* Right Side Actions */}
             <div className="flex items-center space-x-4">
               {/* Search */}
-              <button className="text-white hover:text-cyan-400 transition-colors p-2">
+              <button
+                className="text-white hover:text-cyan-400 transition-colors p-2"
+                aria-label="Search"
+                title="Search"
+              >
                 <Search size={20} />
               </button>
 
@@ -86,6 +90,8 @@ export default function Header() {
               <button
                 onClick={() => setIsCartOpen(true)}
                 className="relative text-white hover:text-cyan-400 transition-colors p-2"
+                aria-label="View cart"
+                title="View cart"
               >
                 <ShoppingCart size={20} />
                 {totalItems > 0 && (
@@ -103,6 +109,8 @@ export default function Header() {
               <button
                 className="md:hidden text-white hover:text-cyan-400 transition-colors p-2"
                 onClick={() => setIsMenuOpen(true)}
+                aria-label="Open mobile menu"
+                title="Open mobile menu"
               >
                 <Menu size={20} />
               </button>

@@ -96,6 +96,8 @@ export default function CheckoutPage() {
                       <button
                         onClick={() => updateQuantity(item.id, item.quantity - 1)}
                         className="p-1 text-gray-400 hover:text-white transition-colors"
+                        aria-label={`Decrease quantity of ${item.name}`}
+                        title={`Decrease quantity of ${item.name}`}
                       >
                         <Minus size={16} />
                       </button>
@@ -103,6 +105,8 @@ export default function CheckoutPage() {
                       <button
                         onClick={() => updateQuantity(item.id, item.quantity + 1)}
                         className="p-1 text-gray-400 hover:text-white transition-colors"
+                        aria-label={`Increase quantity of ${item.name}`}
+                        title={`Increase quantity of ${item.name}`}
                       >
                         <Plus size={16} />
                       </button>
@@ -117,6 +121,8 @@ export default function CheckoutPage() {
                     <button
                       onClick={() => removeItem(item.id)}
                       className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                      aria-label={`Remove ${item.name} from cart`}
+                      title={`Remove ${item.name} from cart`}
                     >
                       <Trash2 size={16} />
                     </button>
